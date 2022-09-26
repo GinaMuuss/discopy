@@ -44,6 +44,11 @@ def get_graph(inner_symbol, outer_symbol):
 
 def main():
     a = get_graph(beta, phi)
+    #b = a.to_pyzx()
+    #c = b.to_tikz()
+    #with open("a", "w") as f:
+    #    f.write(c)
+    #print(c)
     b = simplify_qaoa(a, beta, phi)
     b.draw()
 main()

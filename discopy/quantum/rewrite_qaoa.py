@@ -1,6 +1,10 @@
-from pyzx import VertexType
+import itertools
+from pyzx import VertexType, draw
+import pyzx
+from pyzx.graph.graph_s import GraphS
 from fractions import Fraction
 from pyzx.graph.base import VT
+from pyzx.utils import EdgeType
 from sympy import sympify
 from typing import List, Tuple
 import pyzx as zx
@@ -9,6 +13,7 @@ import sympy
 import discopy
 from discopy.quantum.zx import Diagram as discoZxDiag
 from discopy.quantum.zx import X, Z, Id, Scalar, SWAP, PRO
+from queue import Queue
 
 
 def match_center_pi(graph, symbol) -> List[Tuple[VT, VT]]:
@@ -142,13 +147,110 @@ def find_combinable_sums(diag):
     return candidates
 
 
+def find_cycles(diagram):
+    # this is the worst cicle finder ever...
+    # TODO: use a better algorithm to find 4-cycles
+    # this only finds one cycle...
+    unvisited_nodes = set(diagram.vertices())
+    previous = {x: None for x in diagram.vertices()}
+    stack = []  # tuples of nextnode and where we are comming from
+    while len(stack) > 0 or len(unvisited_nodes) > 0:
+        if len(stack) == 0:
+            a = unvisited_nodes.pop()
+            stack.append((a, None))
+            unvisited_nodes.add(a)
+
+        current, vfrom = stack.pop()
+        for nei in diagram.neighbors(current):
+            if nei == vfrom:
+                continue
+            stack.append((nei, current))
+
+        if vfrom:
+            previous[current] = previous[vfrom] + [vfrom]
+        else:
+            previous[current] = []
+
+        if current in unvisited_nodes:
+            unvisited_nodes.remove(current)
+        else:
+            return previous[current]
+
+
+def find_bialg_reverse(diagram: GraphS):
+    """
+    Atm this only finds one 4 cycle, maybe not the best thing, but should work for now
+    """
+    cycle = list(find_cycles(diagram))
+    for i, v in enumerate(cycle):
+        a = diagram.edge_type(
+            diagram.edge(v, cycle[i + 1 if i < len(cycle) - 1 else 0])
+        )
+        assert a == EdgeType.HADAMARD
+    # TODO: sanity check that this 4 cycle is actually relevant...
+    return cycle
+
+
+def replace_bialg_reverse(diagram: GraphS, cycle: List[VertexType]):
+    # TODO: double check that X spiders
+    assert len(cycle) == 4
+
+    # the first step ist to unspider, s.t. we can apply bialg
+    for v in cycle:
+        pyzx.rules.unspider(diagram, [v, []])
+    
+    print("unspidered the thing")
+    draw(diagram)
+
+    # first we collect the connections for the even and odd ones
+    connect_to_even = []
+    connect_to_odd = []
+    # I know connect_to_even and connect_to_odd seem fliped, but the bialgebra rule does flip the assignment!
+    for i in range(0, len(cycle), 2):
+        connect_to_odd += [
+            (x, diagram.edge_type(diagram.edge(x, cycle[i])))
+            for x in diagram.neighbors(cycle[i])
+            if x not in cycle
+        ]
+    for i in range(1, len(cycle), 2):
+        connect_to_even += [
+            (x, diagram.edge_type(diagram.edge(x, cycle[i])))
+            for x in diagram.neighbors(cycle[i])
+            if x not in cycle
+        ]
+
+    # now we remove the vertices
+    diagram.remove_vertices(cycle)
+
+    # now we add two now ones and their respective edges
+    vEven, vOdd = diagram.add_vertices(2)
+    diagram.set_type(vEven, VertexType.Z)
+    diagram.set_type(vOdd, VertexType.X)
+    diagram.add_edges([diagram.edge(vOdd, vEven)], EdgeType.SIMPLE)
+
+    for v2, eType in connect_to_odd:
+        realtype = EdgeType.HADAMARD if eType == EdgeType.SIMPLE else EdgeType.SIMPLE
+        diagram.add_edges([diagram.edge(vOdd, v2)], realtype)
+    for v2, eType in connect_to_even:
+        diagram.add_edges([diagram.edge(vEven, v2)], eType)
+    return diagram
+
+
 def simplify_inner(diagram: discopy.quantum.zx.Diagram, inner_symbol, outer_symbol):
-    #diagram.draw()
+    # diagram.draw()
     pyzx_final = diagram.to_pyzx()
     zx.simplify.clifford_simp(pyzx_final)
-    #for i in range(5):
-        #zx.simplify.spider_simp(pyzx_final)
-        #zx.simplify.id_simp(pyzx_final)
+    print("Before the bialg replace")
+    draw(pyzx_final)
+    cycle = find_bialg_reverse(pyzx_final)
+    pyzx_final = replace_bialg_reverse(pyzx_final, cycle)
+    print("After the bialg replace")
+    draw(pyzx_final)
+    # for i in range(5):
+    zx.simplify.clifford_simp(pyzx_final)
+    print("After clifford_simp")
+    draw(pyzx_final)
+    # zx.simplify.id_simp(pyzx_final)
     d = discopy.quantum.zx.Diagram.from_pyzx(pyzx_final)
     d.draw()
     return d
