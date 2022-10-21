@@ -146,48 +146,49 @@ def find_combinable_sums(diag):
             candidates.append(i)
     return candidates
 
-
-def find_cycles(diagram):
-    # this is the worst cicle finder ever...
-    # TODO: use a better algorithm to find 4-cycles
-    # this only finds one cycle...
-    unvisited_nodes = set(diagram.vertices())
-    previous = {x: None for x in diagram.vertices()}
-    stack = []  # tuples of nextnode and where we are comming from
-    while len(stack) > 0 or len(unvisited_nodes) > 0:
-        if len(stack) == 0:
-            a = unvisited_nodes.pop()
-            stack.append((a, None))
-            unvisited_nodes.add(a)
-
-        current, vfrom = stack.pop()
-        for nei in diagram.neighbors(current):
-            if nei == vfrom:
-                continue
-            stack.append((nei, current))
-
-        if vfrom:
-            previous[current] = previous[vfrom] + [vfrom]
-        else:
-            previous[current] = []
-
-        if current in unvisited_nodes:
-            unvisited_nodes.remove(current)
-        else:
-            return previous[current]
-
+def find_four_cycles(diagram):
+    candidates = []
+    z_vertices = [x for x in diagram.vertices() if diagram.type(x) == VertexType.Z]
+    for i,j,k in itertools.combinations(z_vertices, 3):
+        if diagram.edge_type(
+            diagram.edge(i, j)
+        ) != EdgeType.HADAMARD:
+            continue
+        if diagram.edge_type(
+            diagram.edge(j, k)
+        ) != EdgeType.HADAMARD:
+            continue
+        if diagram.edge_type(
+            diagram.edge(i, k)
+        ) != 0:
+            continue
+        neigh_i = set([x for x in diagram.neighbors(i) if diagram.edge_type(
+            diagram.edge(x, i)
+        ) == EdgeType.HADAMARD])
+        neigh_k = set([x for x in diagram.neighbors(i) if diagram.edge_type(
+            diagram.edge(x, k)
+        ) == EdgeType.HADAMARD])
+        both_neighbour = set(neigh_i).intersection(set(neigh_k))
+        assert j in both_neighbour
+        both_neighbour = both_neighbour.difference(set([j]))
+        if len(both_neighbour) > 0:
+            candidates.append((i,j,k, both_neighbour.pop()))
+            continue
+    return candidates
+        
 
 def find_bialg_reverse(diagram: GraphS):
     """
     Atm this only finds one 4 cycle, maybe not the best thing, but should work for now
     """
-    cycle = list(find_cycles(diagram))
+    cycles = find_four_cycles(diagram)
+    assert len(cycles) > 0
+    cycle = cycles[0]
     for i, v in enumerate(cycle):
         a = diagram.edge_type(
             diagram.edge(v, cycle[i + 1 if i < len(cycle) - 1 else 0])
         )
         assert a == EdgeType.HADAMARD
-    # TODO: sanity check that this 4 cycle is actually relevant...
     return cycle
 
 
@@ -239,7 +240,15 @@ def replace_bialg_reverse(diagram: GraphS, cycle: List[VertexType]):
 def simplify_inner(diagram: discopy.quantum.zx.Diagram, inner_symbol, outer_symbol):
     # diagram.draw()
     pyzx_final = diagram.to_pyzx()
-    zx.simplify.clifford_simp(pyzx_final)
+    draw(pyzx_final)
+    zx.to_gh(pyzx_final)
+    #while True:
+    #    i1 = zx.id_simp(pyzx_final)
+    #    i2 = zx.spider_simp(pyzx_final)
+    #    if i1+i2==0: break
+    zx.clifford_simp(pyzx_final)
+    a = pyzx_final.to_matrix()
+    print(sympy.simplify(a[0]))
     print("Before the bialg replace")
     draw(pyzx_final)
     cycle = find_bialg_reverse(pyzx_final)
@@ -250,6 +259,11 @@ def simplify_inner(diagram: discopy.quantum.zx.Diagram, inner_symbol, outer_symb
     zx.simplify.clifford_simp(pyzx_final)
     print("After clifford_simp")
     draw(pyzx_final)
+    a = pyzx_final.to_matrix()
+    print(sympy.simplify(a[0]))
+    print("subing", 0.2, 0.5)
+    print(a[0][0].subs(outer_symbol, 0.2).subs(inner_symbol, 0.2))
+    print("result", sympy.simplify(a[0][0].subs(outer_symbol, 0.5).subs(inner_symbol, 1)))
     # zx.simplify.id_simp(pyzx_final)
     d = discopy.quantum.zx.Diagram.from_pyzx(pyzx_final)
     d.draw()
