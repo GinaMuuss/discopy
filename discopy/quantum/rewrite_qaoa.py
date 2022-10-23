@@ -197,7 +197,8 @@ def replace_bialg_reverse(diagram: GraphS, cycle: List[VertexType]):
 
     # the first step ist to unspider, s.t. we can apply bialg
     for v in cycle:
-        pyzx.rules.unspider(diagram, [v, []])
+        if diagram.phase(v) != 0:
+            pyzx.rules.unspider(diagram, [v, []])
     
     print("unspidered the thing")
     draw(diagram)
@@ -224,8 +225,8 @@ def replace_bialg_reverse(diagram: GraphS, cycle: List[VertexType]):
 
     # now we add two now ones and their respective edges
     vEven, vOdd = diagram.add_vertices(2)
-    diagram.set_type(vEven, VertexType.Z)
-    diagram.set_type(vOdd, VertexType.X)
+    diagram.set_type(vEven, VertexType.X)
+    diagram.set_type(vOdd, VertexType.Z)
     diagram.add_edges([diagram.edge(vOdd, vEven)], EdgeType.SIMPLE)
 
     for v2, eType in connect_to_odd:
@@ -236,9 +237,43 @@ def replace_bialg_reverse(diagram: GraphS, cycle: List[VertexType]):
     return diagram
 
 
+def bad_heuristic_are_phases_zero(diagram: GraphS, symbol, step_size=0.1):
+    """
+    This is a bad heuristic.
+    It will go through all phases and enter values for the inner_symbol from 0 to 2 with step_size.
+    0 to 2 in pyzx means 0 to 2*pi.
+    If the phase is 0 for all values entered it will reset it to said value.
+    This is problamatic for several reasons and not even that fast.
+    """
+    phases = diagram.phases()
+    for v in diagram.vertices():
+        phase = sympy.Mod(phases[v], 2)
+        print("vertex", v, phases[v], phase, phase.free_symbols)
+        if symbol not in phase.free_symbols:
+            #print("reset phase for vertex, because not in free_symbols", v, "to", phase, type(phase),  isinstance(phase, sympy.core.numbers.Number))
+            if isinstance(phase, sympy.core.numbers.Number):
+                diagram.set_phase(v, Fraction(float(phase)))
+            continue
+        all_zero = True
+        val = 0
+        base_val = phase.subs({symbol: val}) 
+        while val <= 2:
+            print(phase, val, phase.subs({symbol: val}))
+            if phase.subs({symbol: val}) != base_val:
+                all_zero = False
+                break
+            val += abs(step_size)
+        if all_zero:
+            #print("reset phase for vertex", v, "to", base_val)
+            diagram.set_phase(v, base_val)
+    return diagram
+
+
 def simplify_inner(diagram: discopy.quantum.zx.Diagram, inner_symbol, outer_symbol):
     # diagram.draw()
     pyzx_final = diagram.to_pyzx()
+    print("Before doing anything")
+    draw(pyzx_final)
     zx.simplify.clifford_simp(pyzx_final)
     print("Before the bialg replace")
     draw(pyzx_final)
@@ -247,6 +282,14 @@ def simplify_inner(diagram: discopy.quantum.zx.Diagram, inner_symbol, outer_symb
     print("After the bialg replace")
     draw(pyzx_final)
     # for i in range(5):
+    zx.simplify.clifford_simp(pyzx_final)
+    print("After clifford_simp")
+    draw(pyzx_final)
+
+    pyzx_final = bad_heuristic_are_phases_zero(pyzx_final, outer_symbol)
+    print("After bad phase heuristic")
+    draw(pyzx_final)
+  
     zx.simplify.clifford_simp(pyzx_final)
     print("After clifford_simp")
     draw(pyzx_final)
