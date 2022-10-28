@@ -149,7 +149,7 @@ def find_combinable_sums(diag):
 def find_four_cycles(diagram):
     candidates = []
     z_vertices = [x for x in diagram.vertices() if diagram.type(x) == VertexType.Z]
-    for i,j,k in itertools.combinations(z_vertices, 3):
+    for i,j,k in itertools.permutations(z_vertices, 3):
         if diagram.edge_type(
             diagram.edge(i, j)
         ) != EdgeType.HADAMARD:
@@ -165,14 +165,17 @@ def find_four_cycles(diagram):
         neigh_i = set([x for x in diagram.neighbors(i) if diagram.edge_type(
             diagram.edge(x, i)
         ) == EdgeType.HADAMARD])
-        neigh_k = set([x for x in diagram.neighbors(i) if diagram.edge_type(
+        neigh_k = set([x for x in diagram.neighbors(k) if diagram.edge_type(
             diagram.edge(x, k)
         ) == EdgeType.HADAMARD])
         both_neighbour = set(neigh_i).intersection(set(neigh_k))
         assert j in both_neighbour
         both_neighbour = both_neighbour.difference(set([j]))
         if len(both_neighbour) > 0:
-            candidates.append((i,j,k, both_neighbour.pop()))
+            n = both_neighbour.pop()
+            if any([x in candidates for x in itertools.permutations((i,j,k, n), 4)]):
+                continue
+            candidates.append((i,j,k, n))
             continue
     return candidates
         
@@ -182,7 +185,8 @@ def find_bialg_reverse(diagram: GraphS):
     Atm this only finds one 4 cycle, maybe not the best thing, but should work for now
     """
     cycles = find_four_cycles(diagram)
-    assert len(cycles) > 0
+    if len(cycles) == 0:
+        return None
     cycle = cycles[0]
     for i, v in enumerate(cycle):
         a = diagram.edge_type(
@@ -195,7 +199,6 @@ def find_bialg_reverse(diagram: GraphS):
 def replace_bialg_reverse(diagram: GraphS, cycle: List[VertexType]):
     # TODO: double check that X spiders
     assert len(cycle) == 4
-
     # the first step ist to unspider, s.t. we can apply bialg
     for v in cycle:
         if diagram.phase(v) != 0:
@@ -237,6 +240,19 @@ def replace_bialg_reverse(diagram: GraphS, cycle: List[VertexType]):
         diagram.add_edges([diagram.edge(vEven, v2)], eType)
     return diagram
 
+def my_clifford(g, quiet=True, stats=None):
+    zx.simplify.spider_simp(g, quiet=quiet, stats=stats)
+    zx.simplify.to_gh(g)
+    i = 0
+    while True:
+        i1 = zx.simplify.id_simp(g, quiet=quiet, stats=stats)
+        i2 = zx.simplify.spider_simp(g, quiet=quiet, stats=stats)
+        #i3 = pivot_simp(g, quiet=quiet, stats=stats)
+        #i4 = lcomp_simp(g, quiet=quiet, stats=stats)
+        if i1+i2==0: break
+        #if i1+i2+i3+i4==0: break
+        i += 1
+    return i
 
 def bad_heuristic_are_phases_zero(diagram: GraphS, symbol, step_size=0.1):
     """
@@ -275,26 +291,32 @@ def simplify_inner(diagram: discopy.quantum.zx.Diagram, inner_symbol, outer_symb
     pyzx_final = diagram.to_pyzx()
     print("Before doing anything")
     draw(pyzx_final)
-    zx.simplify.clifford_simp(pyzx_final)
 
-    print("Before the bialg replace")
-    draw(pyzx_final)
-    cycle = find_bialg_reverse(pyzx_final)
-    pyzx_final = replace_bialg_reverse(pyzx_final, cycle)
-    print("After the bialg replace")
-    draw(pyzx_final)
-    # for i in range(5):
-    zx.simplify.clifford_simp(pyzx_final)
-    print("After clifford_simp")
-    draw(pyzx_final)
+    zx.to_gh(pyzx_final)
+    #while True:
+    #    i1 = zx.id_simp(pyzx_final)
+    #    i2 = zx.spider_simp(pyzx_final)
+    #    if i1+i2==0: break
+    my_clifford(pyzx_final)
+    #a = pyzx_final.to_matrix()
+    #print(sympy.simplify(a[0]))
+    while cycle := find_bialg_reverse(pyzx_final):
+        print("Before the bialg replace")
+        draw(pyzx_final, labels=True)
+        pyzx_final = replace_bialg_reverse(pyzx_final, cycle)
+        print("After the bialg replace")
+        draw(pyzx_final)
+        my_clifford(pyzx_final)
+        print("After clifford_simp")
+        draw(pyzx_final)
     pyzx_final = bad_heuristic_are_phases_zero(pyzx_final, outer_symbol)
     print("After bad phase heuristic")
     draw(pyzx_final)
-  
-    zx.simplify.clifford_simp(pyzx_final)
-    print("After clifford_simp")
-    draw(pyzx_final)
-
+    #a = pyzx_final.to_matrix()
+    #print(sympy.simplify(a[0]))
+    #print("subing", 0.2, 0.5)
+    #print(a[0][0].subs(outer_symbol, 0.2).subs(inner_symbol, 0.2))
+    #print("result", sympy.simplify(a[0][0].subs(outer_symbol, 0.5).subs(inner_symbol, 1)))
     # zx.simplify.id_simp(pyzx_final)
     d = discopy.quantum.zx.Diagram.from_pyzx(pyzx_final)
     d.draw()
