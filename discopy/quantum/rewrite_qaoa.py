@@ -201,11 +201,12 @@ def replace_bialg_reverse(diagram: GraphS, cycle: List[VertexType]):
     assert len(cycle) == 4
     # the first step ist to unspider, s.t. we can apply bialg
     for v in cycle:
-        if diagram.phase(v) != 0:
-            pyzx.rules.unspider(diagram, [v, []])
+        if diagram.phase(v) != 0 or len(diagram.neighbors(v)) > 2:
+            pyzx.rules.unspider(diagram, [v, list(set(diagram.neighbors(v)).difference(set(cycle)))])
     
     print("unspidered the thing")
-    draw(diagram)
+    draw(diagram, labels=True)
+    print("running bialg reverse for cycle", cycle)
 
     # first we collect the connections for the even and odd ones
     connect_to_even = []
@@ -246,7 +247,14 @@ def my_clifford(g, quiet=True, stats=None):
     i = 0
     while True:
         i1 = zx.simplify.id_simp(g, quiet=quiet, stats=stats)
+        if i1 > 0:
+            print("idsimp")
+            mydraw(g)
         i2 = zx.simplify.spider_simp(g, quiet=quiet, stats=stats)
+        if i2 > 0:
+            print("spidersimp")
+            mydraw(g)
+
         #i3 = pivot_simp(g, quiet=quiet, stats=stats)
         #i4 = lcomp_simp(g, quiet=quiet, stats=stats)
         if i1+i2==0: break
@@ -285,12 +293,15 @@ def bad_heuristic_are_phases_zero(diagram: GraphS, symbol, step_size=0.1):
             diagram.set_phase(v, base_val)
     return diagram
 
+def mydraw(graph):
+    draw(graph, labels=True)
+    print(graph.global_phase())
 
 def simplify_inner(diagram: discopy.quantum.zx.Diagram, inner_symbol, outer_symbol):
     # diagram.draw()
     pyzx_final = diagram.to_pyzx()
     print("Before doing anything")
-    draw(pyzx_final)
+    mydraw(pyzx_final)
 
     zx.to_gh(pyzx_final)
     #while True:
@@ -300,24 +311,36 @@ def simplify_inner(diagram: discopy.quantum.zx.Diagram, inner_symbol, outer_symb
     my_clifford(pyzx_final)
     #a = pyzx_final.to_matrix()
     #print(sympy.simplify(a[0]))
-    while cycle := find_bialg_reverse(pyzx_final):
-        print("Before the bialg replace")
-        draw(pyzx_final, labels=True)
-        pyzx_final = replace_bialg_reverse(pyzx_final, cycle)
-        print("After the bialg replace")
-        draw(pyzx_final)
-        my_clifford(pyzx_final)
+    smth_changed = True
+    while smth_changed:
+        smth_changed = False
+        print("Start of the simplification loop")
+        mydraw(pyzx_final)
+
+        if cycle := find_bialg_reverse(pyzx_final):
+            pyzx_final = replace_bialg_reverse(pyzx_final, cycle)
+            print("After the bialg replace")
+            mydraw(pyzx_final)
+            smth_changed = True
+        else:
+            print("No cycle found")
+        
+        smth_changed = smth_changed or my_clifford(pyzx_final) > 0
         print("After clifford_simp")
-        draw(pyzx_final)
-    pyzx_final = bad_heuristic_are_phases_zero(pyzx_final, outer_symbol)
-    print("After bad phase heuristic")
-    draw(pyzx_final)
-    #a = pyzx_final.to_matrix()
-    #print(sympy.simplify(a[0]))
-    #print("subing", 0.2, 0.5)
-    #print(a[0][0].subs(outer_symbol, 0.2).subs(inner_symbol, 0.2))
-    #print("result", sympy.simplify(a[0][0].subs(outer_symbol, 0.5).subs(inner_symbol, 1)))
-    # zx.simplify.id_simp(pyzx_final)
+        mydraw(pyzx_final)
+        
+        pyzx_final = bad_heuristic_are_phases_zero(pyzx_final, outer_symbol)
+        print("After bad phase heuristic")
+        mydraw(pyzx_final)
+
+        smth_changed = smth_changed or my_clifford(pyzx_final) > 0
+        print("After clifford simp again")
+        mydraw(pyzx_final)
+
+        print("After copy simp")
+        smth_changed = smth_changed or zx.simplify.copy_simp(pyzx_final) > 0
+        mydraw(pyzx_final)
+
     d = discopy.quantum.zx.Diagram.from_pyzx(pyzx_final)
     d.draw()
     return d
