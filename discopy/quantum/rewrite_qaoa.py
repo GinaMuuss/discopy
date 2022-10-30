@@ -239,6 +239,7 @@ def replace_bialg_reverse(diagram: GraphS, cycle: List[VertexType]):
         diagram.add_edges([diagram.edge(vOdd, v2)], realtype)
     for v2, eType in connect_to_even:
         diagram.add_edges([diagram.edge(vEven, v2)], eType)
+    diagram.scalar.add_power(-1)
     return diagram
 
 def my_clifford(g, quiet=True, stats=None):
@@ -273,7 +274,7 @@ def bad_heuristic_are_phases_zero(diagram: GraphS, symbol, step_size=0.1):
     phases = diagram.phases()
     for v in diagram.vertices():
         phase = sympy.Mod(phases[v], 2)
-        print("vertex", v, phases[v], phase, phase.free_symbols)
+        #print("vertex", v, phases[v], phase, phase.free_symbols)
         if symbol not in phase.free_symbols:
             #print("reset phase for vertex, because not in free_symbols", v, "to", phase, type(phase),  isinstance(phase, sympy.core.numbers.Number))
             if isinstance(phase, sympy.core.numbers.Number):
@@ -283,7 +284,7 @@ def bad_heuristic_are_phases_zero(diagram: GraphS, symbol, step_size=0.1):
         val = 0
         base_val = phase.subs({symbol: val}) 
         while val <= 2:
-            print(phase, val, phase.subs({symbol: val}))
+            #print(phase, val, phase.subs({symbol: val}))
             if phase.subs({symbol: val}) != base_val:
                 all_zero = False
                 break
@@ -296,6 +297,7 @@ def bad_heuristic_are_phases_zero(diagram: GraphS, symbol, step_size=0.1):
 def mydraw(graph):
     draw(graph, labels=True)
     print(graph.global_phase())
+    print(graph.scalar.to_json())
 
 def simplify_inner(diagram: discopy.quantum.zx.Diagram, inner_symbol, outer_symbol):
     # diagram.draw()
