@@ -14,6 +14,7 @@ import discopy
 from discopy.quantum.zx import Diagram as discoZxDiag
 from discopy.quantum.zx import X, Z, Id, Scalar, SWAP, PRO
 from queue import Queue
+import random
 
 
 def match_center_pi(graph, symbol) -> List[Tuple[VT, VT]]:
@@ -204,8 +205,8 @@ def replace_bialg_reverse(diagram: GraphS, cycle: List[VertexType]):
         if diagram.phase(v) != 0 or len(diagram.neighbors(v)) > 2:
             pyzx.rules.unspider(diagram, [v, list(set(diagram.neighbors(v)).difference(set(cycle)))])
     
-    print("unspidered the thing")
-    draw(diagram, labels=True)
+    #print("unspidered the thing")
+    #draw(diagram, labels=True)
     print("running bialg reverse for cycle", cycle)
 
     # first we collect the connections for the even and odd ones
@@ -248,13 +249,13 @@ def my_clifford(g, quiet=True, stats=None):
     i = 0
     while True:
         i1 = zx.simplify.id_simp(g, quiet=quiet, stats=stats)
-        if i1 > 0:
-            print("idsimp")
-            mydraw(g)
+        #if i1 > 0:
+        #    print("idsimp")
+        #    mydraw(g)
         i2 = zx.simplify.spider_simp(g, quiet=quiet, stats=stats)
-        if i2 > 0:
-            print("spidersimp")
-            mydraw(g)
+        #if i2 > 0:
+        #    print("spidersimp")
+        #    mydraw(g)
 
         #i3 = pivot_simp(g, quiet=quiet, stats=stats)
         #i4 = lcomp_simp(g, quiet=quiet, stats=stats)
@@ -294,9 +295,71 @@ def bad_heuristic_are_phases_zero(diagram: GraphS, symbol, step_size=0.1):
             diagram.set_phase(v, base_val)
     return diagram
 
-def mydraw(graph):
+def find_pi_commute(graph: GraphS):
+    candidates = []
+    for v in graph.vertices():
+        if graph.type(v) != VertexType.Z:
+            continue
+        if graph.phase(v) != 1:
+            continue
+        if len(graph.neighbors(v)) != 2:
+            continue
+        for n in graph.neighbors(v):
+            if graph.phase(n) == 1:
+                continue
+            if graph.type(n) != VertexType.Z:
+                continue
+            if graph.edge_type(graph.edge(v, n)) != EdgeType.HADAMARD:
+                continue
+            candidates.append((v, n))
+            break
+    return candidates
+
+def apply_pi_commute(graph: GraphS, pi_v, commute_through):
+    neighbors = list(graph.neighbors(pi_v))
+    pi_v_type = graph.type(pi_v)
+    print("pi commute choose", commute_through)
+
+    # first remove the edges
+    later_connect_to_pi = [(x, graph.edge_type(graph.edge(commute_through, x))) for x in graph.neighbors(commute_through) if x != pi_v]
+    later_connect_to_commute_through = [(x, graph.edge_type(graph.edge(pi_v, x))) for x in graph.neighbors(pi_v) if x != commute_through]
+    graph.remove_edges([graph.edge(commute_through, x) for x, _ in later_connect_to_pi])
+    graph.remove_edges([graph.edge(pi_v, x) for x, _ in later_connect_to_commute_through])
+    type_pi_commute_through = graph.edge_type(graph.edge(pi_v, commute_through))
+    graph.remove_edge(graph.edge(pi_v, commute_through))
+
+    # flip the phase of what we commute through
+    graph.scalar.add_phase(sympy.exp(graph.phase(commute_through)*1j))
+    graph.set_phase(commute_through, -graph.phase(commute_through))
+    graph.remove_vertex(pi_v)
+
+    # add new pi spiders an connect them
+    if len(later_connect_to_pi) == 0:
+        # we need at least one.
+        new_pi_v = graph.add_vertices(1)[0]
+        graph.set_type(new_pi_v, pi_v_type)
+        graph.set_phase(new_pi_v, 1)
+        graph.add_edges([graph.edge(new_pi_v, commute_through)], EdgeType.SIMPLE)
+    else:
+        new_vertices = graph.add_vertices(len(later_connect_to_pi))
+        for new_pi_i in range(len(later_connect_to_pi)):
+            new_pi_v = new_vertices[new_pi_i]
+            graph.set_type(new_pi_v, pi_v_type)
+            graph.set_phase(new_pi_v, 1)
+            graph.add_edges([graph.edge(new_pi_v, later_connect_to_pi[new_pi_i][0])], later_connect_to_pi[new_pi_i][1])
+            graph.add_edges([graph.edge(new_pi_v, commute_through)], EdgeType.SIMPLE)
+
+    # add the edges to the commuted spider    
+    for n, t in later_connect_to_commute_through:
+        graph.add_edges([graph.edge(commute_through, n)], t)
+    
+    return graph
+
+
+def mydraw(graph: GraphS):
+    graph.normalize()
     draw(graph, labels=True)
-    print(graph.global_phase())
+    #print(graph.global_phase())
     print(graph.scalar.to_json())
 
 def simplify_inner(diagram: discopy.quantum.zx.Diagram, inner_symbol, outer_symbol):
@@ -317,34 +380,47 @@ def simplify_inner(diagram: discopy.quantum.zx.Diagram, inner_symbol, outer_symb
     while smth_changed:
         smth_changed = False
         print("Start of the simplification loop")
-        mydraw(pyzx_final)
+        #mydraw(pyzx_final)
 
         if cycle := find_bialg_reverse(pyzx_final):
             pyzx_final = replace_bialg_reverse(pyzx_final, cycle)
-            print("After the bialg replace")
-            mydraw(pyzx_final)
+            #print("After the bialg replace")
+            #mydraw(pyzx_final)
             smth_changed = True
         else:
-            print("No cycle found")
+            pass
+            #print("No cycle found")
         
         smth_changed = smth_changed or my_clifford(pyzx_final) > 0
-        print("After clifford_simp")
-        mydraw(pyzx_final)
+        #print("After clifford_simp")
+        #mydraw(pyzx_final)
         
         pyzx_final = bad_heuristic_are_phases_zero(pyzx_final, outer_symbol)
-        print("After bad phase heuristic")
-        mydraw(pyzx_final)
+        #print("After bad phase heuristic")
+        #mydraw(pyzx_final)
 
         smth_changed = smth_changed or my_clifford(pyzx_final) > 0
-        print("After clifford simp again")
-        mydraw(pyzx_final)
+        #print("After clifford simp again")
+        #mydraw(pyzx_final)
 
-        print("After copy simp")
+        #print("After copy simp")
         smth_changed = smth_changed or zx.simplify.copy_simp(pyzx_final) > 0
-        mydraw(pyzx_final)
+        #mydraw(pyzx_final)
 
+        if not smth_changed:
+            # if nothing changed, one last attempt with pi commute
+            pi_comm_cand = find_pi_commute(pyzx_final)
+            print("candidates", pi_comm_cand)
+            if len(pi_comm_cand) > 0:
+                mydraw(pyzx_final)
+                pyzx_final = apply_pi_commute(pyzx_final, *(pi_comm_cand[0]))
+                mydraw(pyzx_final)
+                smth_changed = True
+
+    print("after simplification")
+    mydraw(pyzx_final)
     d = discopy.quantum.zx.Diagram.from_pyzx(pyzx_final)
-    d.draw()
+    #d.draw()
     return d
 
 

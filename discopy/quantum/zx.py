@@ -89,7 +89,7 @@ class Diagram(tensor.Diagram):
         ...     7: {5: 1}}
         """
         from pyzx import VertexType, EdgeType
-        from pyzx.graph.graph_s import GraphSGlobalPhase as Graph
+        from pyzx.graph.graph_s import GraphS as Graph
         graph, scan = Graph(), []
         for i, _ in enumerate(self.dom):
             node, hadamard = graph.add_vertex(VertexType.BOUNDARY), False
