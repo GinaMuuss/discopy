@@ -339,7 +339,7 @@ def apply_pi_commute(graph: GraphS, pi_v, commute_through):
         new_pi_v = graph.add_vertices(1)[0]
         graph.set_type(new_pi_v, pi_v_type)
         graph.set_phase(new_pi_v, 1)
-        graph.add_edges([graph.edge(new_pi_v, commute_through)], EdgeType.SIMPLE)
+        graph.add_edges([graph.edge(new_pi_v, commute_through)], type_pi_commute_through)
     else:
         new_vertices = graph.add_vertices(len(later_connect_to_pi))
         for new_pi_i in range(len(later_connect_to_pi)):
@@ -347,11 +347,11 @@ def apply_pi_commute(graph: GraphS, pi_v, commute_through):
             graph.set_type(new_pi_v, pi_v_type)
             graph.set_phase(new_pi_v, 1)
             graph.add_edges([graph.edge(new_pi_v, later_connect_to_pi[new_pi_i][0])], later_connect_to_pi[new_pi_i][1])
-            graph.add_edges([graph.edge(new_pi_v, commute_through)], EdgeType.SIMPLE)
+            graph.add_edges([graph.edge(new_pi_v, commute_through)], type_pi_commute_through)
 
     # add the edges to the commuted spider    
     for n, t in later_connect_to_commute_through:
-        graph.add_edges([graph.edge(commute_through, n)], t)
+        graph.add_edges([graph.edge(commute_through, n)], EdgeType.HADAMARD if t == EdgeType.SIMPLE else EdgeType.SIMPLE)
     
     return graph
 
