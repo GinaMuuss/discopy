@@ -1,4 +1,5 @@
 import itertools
+from ossaudiodev import control_names
 from pyzx import VertexType, draw
 import pyzx
 from pyzx.graph.graph_s import GraphS
@@ -329,7 +330,7 @@ def apply_pi_commute(graph: GraphS, pi_v, commute_through):
     graph.remove_edge(graph.edge(pi_v, commute_through))
 
     # flip the phase of what we commute through
-    graph.scalar.add_phase(sympy.exp(graph.phase(commute_through)*1j))
+    graph.scalar.add_float(sympy.exp(graph.phase(commute_through)*1j))
     graph.set_phase(commute_through, -graph.phase(commute_through))
     graph.remove_vertex(pi_v)
 
@@ -384,38 +385,47 @@ def simplify_inner(diagram: discopy.quantum.zx.Diagram, inner_symbol, outer_symb
 
         if cycle := find_bialg_reverse(pyzx_final):
             pyzx_final = replace_bialg_reverse(pyzx_final, cycle)
-            #print("After the bialg replace")
-            #mydraw(pyzx_final)
+            print("After the bialg replace")
+            mydraw(pyzx_final)
             smth_changed = True
         else:
+            print("No cycle found")
             pass
-            #print("No cycle found")
         
-        smth_changed = smth_changed or my_clifford(pyzx_final) > 0
-        #print("After clifford_simp")
-        #mydraw(pyzx_final)
+        a = my_clifford(pyzx_final) > 0
+        smth_changed = smth_changed or a
+        if a:
+            print("After clifford_simp")
+            mydraw(pyzx_final)
         
         pyzx_final = bad_heuristic_are_phases_zero(pyzx_final, outer_symbol)
-        #print("After bad phase heuristic")
-        #mydraw(pyzx_final)
+        print("After bad phase heuristic")
+        mydraw(pyzx_final)
 
-        smth_changed = smth_changed or my_clifford(pyzx_final) > 0
-        #print("After clifford simp again")
-        #mydraw(pyzx_final)
+        a =  my_clifford(pyzx_final) > 0
+        smth_changed = smth_changed or a
+        if a:
+            print("After clifford simp again")
+            mydraw(pyzx_final)
+        
+        if smth_changed:
+            continue
+        a = zx.simplify.copy_simp(pyzx_final) > 0
+        smth_changed = smth_changed or a
+        if a:
+            print("After copy simp")
+            mydraw(pyzx_final)
 
-        #print("After copy simp")
-        smth_changed = smth_changed or zx.simplify.copy_simp(pyzx_final) > 0
-        #mydraw(pyzx_final)
-
-        if not smth_changed:
-            # if nothing changed, one last attempt with pi commute
-            pi_comm_cand = find_pi_commute(pyzx_final)
-            print("candidates", pi_comm_cand)
-            if len(pi_comm_cand) > 0:
-                mydraw(pyzx_final)
-                pyzx_final = apply_pi_commute(pyzx_final, *(pi_comm_cand[0]))
-                mydraw(pyzx_final)
-                smth_changed = True
+        if smth_changed:
+            continue
+        # if nothing changed, one last attempt with pi commute
+        pi_comm_cand = find_pi_commute(pyzx_final)
+        print("candidates", pi_comm_cand)
+        if len(pi_comm_cand) > 0:
+            mydraw(pyzx_final)
+            pyzx_final = apply_pi_commute(pyzx_final, *(pi_comm_cand[0]))
+            mydraw(pyzx_final)
+            smth_changed = True
 
     print("after simplification")
     mydraw(pyzx_final)
