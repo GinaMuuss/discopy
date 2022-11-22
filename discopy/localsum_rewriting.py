@@ -2,6 +2,47 @@ from typing import List
 import discopy.cat as cat
 import discopy.monoidal as monoidal
 
+def reverse_distribute_composition_cat(
+    arrow: cat.Arrow,
+    index_sum: int,
+    arrow_construction=lambda dom, cod, boxes: cat.Arrow(dom, cod, boxes),
+) -> cat.Arrow:
+    """
+    Reverses distribution by one layer, so pulls one layer out of the sums to the left.
+    Warning: This does not sanity check that this is allowed, it just takes the first layer from the first term and puts it outside.
+
+    Parameters
+    ----------
+    arrow: Arrow
+        The arrow to perform the operation on
+    index_sum: int
+        The index of the sum to distribute for
+    arrow_construction: callable
+        callable returning the arrow equivalent in the relevant category
+
+    Raises
+    ------
+      IndexError: The index of sum does not correspond to a box
+                  or distribute_up_to is negative or to large
+      TypeError: The box at index_sum does not have type sum
+    """
+    if len(arrow.boxes) <= index_sum or index_sum < 0:
+        raise IndexError("index to large or negative, no such box")
+    if not isinstance(arrow.boxes[index_sum], cat.LocalSum):
+        raise TypeError("box at index %d is not a LocalSum", index_sum)
+    
+    term_to_pull_out = arrow.boxes[index_sum].terms[0].boxes[0]
+    new_sum = cat.LocalSum([arrow_construction(term.boxes[1].dom, term.boxes[-1].cod, term.boxes[1:]) for term in arrow.boxes[index_sum].terms])
+
+    new_boxes = arrow.boxes[:index_sum] + [term_to_pull_out] + [new_sum] + (arrow.boxes[index_sum+1] if index_sum > len(arrow.boxes) else [])
+
+    return arrow_construction(
+            arrow.boxes[0].dom,
+            arrow.boxes[-1].cod,
+            new_boxes,
+        )
+
+
 def distribute_composition_cat(
     arrow: cat.Arrow,
     index_sum: int,

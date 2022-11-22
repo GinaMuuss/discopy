@@ -4,7 +4,7 @@ from pytest import raises, fixture
 import discopy
 import discopy.cat as cat
 import discopy.monoidal as monoidal
-from discopy.localsum_rewriting import distribute_composition_cat, distribute_composition_monoidal, distribute_tensor, _check_nothing_in_way
+from discopy.localsum_rewriting import distribute_composition_cat, distribute_composition_monoidal, distribute_tensor, _check_nothing_in_way, reverse_distribute_composition_cat
 
 
 @fixture
@@ -36,6 +36,25 @@ def test_distribute_composition_cat_left(localsum_testdata_cat):
     assert len(a.boxes[0].terms[1].boxes) == 2
     assert a.boxes[0].terms[1].boxes[0].name == "h'"
     assert a.boxes[0].terms[1].boxes[1].name == "g"
+
+
+
+def test_distribute_composition_cat_left_and_reverse(localsum_testdata_cat):
+    _, _, _, _, _, _, _, _, l = localsum_testdata_cat
+    a = distribute_composition_cat(l, 1, 0)
+    print(a)
+    assert len(a.boxes) == 1
+    assert len(a.boxes[0].terms) == 2
+    assert len(a.boxes[0].terms[0].boxes) == 2
+    assert a.boxes[0].terms[0].boxes[0].name == "h'"
+    assert a.boxes[0].terms[0].boxes[1].name == "f"
+    assert len(a.boxes[0].terms[1].boxes) == 2
+    assert a.boxes[0].terms[1].boxes[0].name == "h'"
+    assert a.boxes[0].terms[1].boxes[1].name == "g"
+    a = reverse_distribute_composition_cat(a, 0)
+    print(a)
+
+
 
 
 def test_distribute_composition_cat_right(localsum_testdata_cat):
