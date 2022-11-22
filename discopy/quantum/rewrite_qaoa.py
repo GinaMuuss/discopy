@@ -126,16 +126,28 @@ def combine_sums(diag, sum_index_first):
     assert isinstance(diag.boxes[sum_index_first], LocalSum)
     assert isinstance(diag.boxes[sum_index_first + 1], LocalSum)
     terms = []
+    offset_first_sum = diag.offsets[sum_index_first]
+    end_first_sum = diag.offsets[sum_index_first] + len(diag.boxes[sum_index_first].dom.objects)
+    offset_second_sum = diag.offsets[sum_index_first + 1]
+    end_second_sum = diag.offsets[sum_index_first+ 1] + len(diag.boxes[sum_index_first+ 1].dom.objects)
+
+    id_term = Id(0)
+    if end_first_sum < offset_second_sum:
+        id_term = Id(offset_second_sum - end_first_sum)
+    elif end_second_sum < offset_first_sum:
+        id_term = Id(offset_first_sum - end_second_sum)
+
     for term_left in diag.boxes[sum_index_first].terms:
         for term_right in diag.boxes[sum_index_first + 1].terms:
-            terms += [term_left @ term_right]
+            terms += [term_left @ id_term @ term_right]
+
     l = LocalSum(terms)
     new_boxes = diag.boxes[:sum_index_first] + [l] + diag.boxes[sum_index_first + 2 :]
     return discoZxDiag(
         diag.dom,
         diag.cod,
         new_boxes,
-        diag.offsets[: sum_index_first + 1] + diag.offsets[sum_index_first + 2 :],
+        diag.offsets[: sum_index_first] + [min(offset_first_sum, offset_second_sum)] + diag.offsets[sum_index_first + 2 :],
     )
 
 
@@ -386,10 +398,11 @@ def apply_pi_commute(graph: GraphS, pi_v, commute_through):
 index_fig  = 0
 def mydraw(graph: GraphS):
     global index_fig 
-    graph.normalize()
-    draw(graph, labels=True)
+    pass
+    #graph.normalize()
+    #draw(graph, labels=True)
     # print(graph.global_phase())
-    print(graph.scalar.to_json())
+    #print(graph.scalar.to_json())
 
 
 def print_matrices(pyzx_final, outer_symbol):
@@ -507,6 +520,8 @@ def simplify_inner(diagram: discopy.quantum.zx.Diagram, inner_symbol, outer_symb
     #print_matrices(pyzx_final, outer_symbol)
     s = get_scalar(pyzx_final.scalar)
     print("the scalar is ", s)
+    s = sympy.simplify(s)
+    print("the simplified scalar is ", s)
     return d, s
 
 
@@ -537,7 +552,7 @@ def simplify_qaoa(diagram: discopy.quantum.zx.Diagram, inner_symbol, outer_symbo
         disco_diag.dom, disco_diag.cod, new_boxes, disco_diag.offsets
     )
     print("after pulling to scalar")
-    new_diag.draw()
+    #new_diag.draw()
 
     # we combine adjacent sums
     candidates = find_combinable_sums(new_diag)
@@ -546,7 +561,7 @@ def simplify_qaoa(diagram: discopy.quantum.zx.Diagram, inner_symbol, outer_symbo
         candidates = find_combinable_sums(new_diag)
 
     print("after sum combination")
-    new_diag.draw()
+    #new_diag.draw()
 
     # distribute the sum outward and simplify independetly
     candidates = []

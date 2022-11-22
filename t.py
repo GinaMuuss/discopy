@@ -52,4 +52,6 @@ def main():
     
     b = simplify_qaoa(a, beta, phi)
     b.draw()
-main()
+
+if __name__ == "__main__":
+    main()

@@ -4,7 +4,7 @@ from pytest import raises, fixture
 import discopy
 import discopy.cat as cat
 import discopy.monoidal as monoidal
-from discopy.localsum_rewriting import distribute_composition_cat, distribute_composition_monoidal, distribute_tensor, _check_nothing_in_way, reverse_distribute_composition_cat
+from discopy.localsum_rewriting import distribute_composition_cat, distribute_composition_monoidal, distribute_tensor, _check_nothing_in_way, reverse_distribute_composition_cat, reverse_distribute_tensor
 
 
 @fixture
@@ -42,7 +42,6 @@ def test_distribute_composition_cat_left(localsum_testdata_cat):
 def test_distribute_composition_cat_left_and_reverse(localsum_testdata_cat):
     _, _, _, _, _, _, _, _, l = localsum_testdata_cat
     a = distribute_composition_cat(l, 1, 0)
-    print(a)
     assert len(a.boxes) == 1
     assert len(a.boxes[0].terms) == 2
     assert len(a.boxes[0].terms[0].boxes) == 2
@@ -52,7 +51,8 @@ def test_distribute_composition_cat_left_and_reverse(localsum_testdata_cat):
     assert a.boxes[0].terms[1].boxes[0].name == "h'"
     assert a.boxes[0].terms[1].boxes[1].name == "g"
     a = reverse_distribute_composition_cat(a, 0)
-    print(a)
+    assert len(a.boxes) == 2
+    assert len(a.boxes[1].terms) == 2
 
 
 
@@ -100,6 +100,10 @@ def localsum_testdata_monoidal():
     diag = f @ (diag >> monoidal.Box("t", y @ z, x) >> f) @ g
     return diag
 
+def test_reverse_distribute_tensor(localsum_testdata_monoidal):
+    diag = localsum_testdata_monoidal.normal_form()
+    diag = distribute_tensor(diag, 1, 2)
+    diag = reverse_distribute_tensor(diag, 1, [])
 
 def test_distribute_tensor(localsum_testdata_monoidal):
     diag = localsum_testdata_monoidal.normal_form()
