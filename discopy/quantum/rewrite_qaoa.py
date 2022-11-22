@@ -1,6 +1,7 @@
 import itertools
 from ossaudiodev import control_names
 from pyzx import VertexType, draw
+from pyzx.tikz import to_tikz
 import pyzx
 from pyzx.graph.graph_s import GraphS
 from fractions import Fraction
@@ -382,8 +383,9 @@ def apply_pi_commute(graph: GraphS, pi_v, commute_through):
 
     return graph
 
-
+index_fig  = 0
 def mydraw(graph: GraphS):
+    global index_fig 
     graph.normalize()
     draw(graph, labels=True)
     # print(graph.global_phase())
@@ -510,16 +512,20 @@ def simplify_inner(diagram: discopy.quantum.zx.Diagram, inner_symbol, outer_symb
 
 def simplify_qaoa(diagram: discopy.quantum.zx.Diagram, inner_symbol, outer_symbol):
     pyzx_final = diagram.to_pyzx()
+    print("input diagram")
+    mydraw(pyzx_final)
 
     # Look for the center pi spiders
     # TODO: will this always be pi spiders? how can the center look?
     candidates = match_center_pi(pyzx_final, inner_symbol)
     pyzx_final = permutate_pi_through(pyzx_final, candidates)
     pyzx_final.normalize()
-
+    
     # Do some basic simpification
     zx.simplify.spider_simp(pyzx_final)
     zx.simplify.id_simp(pyzx_final)
+    print("after pi permutation")
+    mydraw(pyzx_final)
     disco_diag = discopy.quantum.zx.Diagram.from_pyzx(pyzx_final)
 
     # find some spiders with symbols where we pull the symbol into a scalar
@@ -530,12 +536,17 @@ def simplify_qaoa(diagram: discopy.quantum.zx.Diagram, inner_symbol, outer_symbo
     new_diag = discoZxDiag(
         disco_diag.dom, disco_diag.cod, new_boxes, disco_diag.offsets
     )
+    print("after pulling to scalar")
+    new_diag.draw()
 
     # we combine adjacent sums
     candidates = find_combinable_sums(new_diag)
     while len(candidates) > 0:
         new_diag = combine_sums(new_diag, candidates[0])
         candidates = find_combinable_sums(new_diag)
+
+    print("after sum combination")
+    new_diag.draw()
 
     # distribute the sum outward and simplify independetly
     candidates = []

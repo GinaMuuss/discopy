@@ -2,7 +2,7 @@ from discopy.drawing import draw
 from discopy.quantum.zx import Z, X, Id, SWAP
 from discopy.quantum.rewrite_qaoa import simplify_qaoa
 from sympy.abc import phi, beta
-
+import pyzx
 
 
 def get_beginning(symbol):
@@ -49,6 +49,7 @@ def main():
     #with open("a", "w") as f:
     #    f.write(c)
     #print(c)
+    
     b = simplify_qaoa(a, beta, phi)
     b.draw()
 main()

@@ -132,6 +132,44 @@ equal to index_sum, no such box"
             new_boxes,
         )
 
+def reverse_distribute_tensor(diagram: monoidal.Diagram, index_sum: int, index_of_tensors_to_pull_out: List[int]
+) -> monoidal.Diagram:
+
+    """
+    Reverses tensor distrbution, 
+    Warning: Does no sanity checks.
+
+    Parameters
+    ----------
+    diagram: Diagram
+        The arrow to perform the operation on
+    index_sum: int
+        The index of the sum to distribute for
+    index_of_tensors_to_pull_out: List[int]
+        for each term of the sum the index of the box to pull out.
+
+    Raises
+    ------
+      IndexError: The index of sum does not correspond to a box or index_of_partner is negative or to large
+      TypeError: The box at index_sum does not have type sum
+    """
+    to_pull_out = diagram.boxes[index_sum].terms[0].boxes[index_of_tensors_to_pull_out[0]]
+    new_terms = []
+    for i, term in enumerate(diagram.boxes[index_sum].terms):
+        terms_boxes = []
+        terms_offsets = []
+        for j, box in enumerate(term.boxes):
+            if j == index_of_tensors_to_pull_out[i]:
+                continue
+            terms_boxes.append(box)
+            terms_offsets.append(term.offsets[j])
+        new_terms.append(monoidal.Diagram(terms_boxes[0].dom, diagram.cod, new_boxes, new_offsets))
+    new_terms = [monoidal.LocalSum([t for i, t in enumerate(term.boxes) if i != index_of_tensors_to_pull_out[j]]) for j, term in enumerate(diagram.boxes[index_sum].terms)]
+
+    new_boxes = diagram.boxes[:index_sum] + [term_to_pull_out] + [new_sum] + (diagram.boxes[index_sum+1] if index_sum > len(diagram.boxes) else [])
+
+    return monoidal.Diagram(diagram.dom, diagram.cod, new_boxes, new_offsets)
+
 
 def distribute_tensor(
     diagram: monoidal.Diagram, index_sum: int, index_of_partner: int
