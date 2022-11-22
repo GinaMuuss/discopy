@@ -514,7 +514,8 @@ def simplify_inner(diagram: discopy.quantum.zx.Diagram, inner_symbol, outer_symb
             smth_changed = True
 
     print("after simplification")
-    mydraw(pyzx_final)
+    pyzx_final.normalize()
+    draw(pyzx_final, labels=True)
     d = discopy.quantum.zx.Diagram.from_pyzx(pyzx_final)
     # d.draw()
     #print_matrices(pyzx_final, outer_symbol)

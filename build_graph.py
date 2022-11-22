@@ -86,7 +86,16 @@ if __name__ == "__main__":
     not_working = []
     #for num_edges in range(len(possible_edges) + 1):
         #for edgeset in itertools.combinations(possible_edges, num_edges):
-    for i in range(500):
+    index_first_graph_with_n = 0
+    while networkx.graph_atlas(index_first_graph_with_n).number_of_nodes() != n:
+        index_first_graph_with_n += 1
+
+    index_first_graph_wiht_n_plus_one = index_first_graph_with_n
+    while networkx.graph_atlas(index_first_graph_wiht_n_plus_one).number_of_nodes() != n + 1:
+        index_first_graph_wiht_n_plus_one += 1
+
+    for i in range(index_first_graph_with_n, index_first_graph_wiht_n_plus_one):
+            print("working on i", i, "that is index", i - index_first_graph_with_n )
             g = networkx.graph_atlas(i)
             if(g.number_of_nodes() < n):
                 continue
